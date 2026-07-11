@@ -1,6 +1,14 @@
 import { createDemoPlan, finalisePlan, validateInput, type Plan, type PlannerInput } from "@/lib/planner";
 
 export const runtime = "edge";
+const maxBodyBytes = 8_000;
+
+function json(body: unknown, status = 200) {
+  return Response.json(body, {
+    status,
+    headers: { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" },
+  });
+}
 
 const schema = {
   type: "object",
@@ -73,6 +81,7 @@ async function generateWithGemini(input: PlannerInput, key: string) {
       contents: [{ role: "user", parts: [{ text: promptFor(input) }] }],
       generationConfig: { temperature: 0.35, responseMimeType: "application/json", responseSchema: schema },
     }),
+    signal: AbortSignal.timeout(15_000),
   });
   if (!response.ok) throw new Error(`Gemini returned ${response.status}`);
   const data = await response.json() as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
@@ -84,18 +93,25 @@ async function generateWithGemini(input: PlannerInput, key: string) {
 
 export async function POST(request: Request) {
   try {
-    const input = validateInput(await request.json());
+    if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) {
+      return json({ error: "Content-Type must be application/json." }, 415);
+    }
+    const declaredLength = Number(request.headers.get("content-length") || 0);
+    if (declaredLength > maxBodyBytes) return json({ error: "Request is too large." }, 413);
+    const body = await request.text();
+    if (new TextEncoder().encode(body).byteLength > maxBodyBytes) return json({ error: "Request is too large." }, 413);
+    const input = validateInput(JSON.parse(body));
     const key = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
     if (!key) {
-      return Response.json(createDemoPlan(input, "Demo engine active — add GEMINI_API_KEY to enable live AI planning."));
+      return json(createDemoPlan(input, "Demo engine active — add GEMINI_API_KEY to enable live AI planning."));
     }
     try {
-      return Response.json(await generateWithGemini(input, key));
+      return json(await generateWithGemini(input, key));
     } catch (error) {
       console.error("Gemini plan rejected; using safe fallback", error);
-      return Response.json(createDemoPlan(input, "AI plan was unavailable or unsafe, so DayDish used its validated fallback."));
+      return json(createDemoPlan(input, "AI plan was unavailable or unsafe, so DayDish used its validated fallback."));
     }
   } catch (error) {
-    return Response.json({ error: error instanceof Error ? error.message : "Invalid request." }, { status: 400 });
+    return json({ error: error instanceof Error ? error.message : "Invalid request." }, 400);
   }
 }

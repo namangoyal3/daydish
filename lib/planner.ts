@@ -178,6 +178,7 @@ export function createDemoPlan(input: PlannerInput = defaultInput, notice?: stri
   const lunchMinutes = Math.min(input.windows.lunch.minutes, 8);
   const dinnerMinutes = Math.min(input.windows.dinner.minutes, exhausted ? 18 : 24);
   const peanutAllergy = /peanut|groundnut/i.test(input.restrictions);
+  const hasMicrowave = input.appliances.includes("Microwave");
 
   const meals: Meal[] = [
     {
@@ -208,10 +209,10 @@ export function createDemoPlan(input: PlannerInput = defaultInput, notice?: stri
   ];
 
   const timeline: TimelineTask[] = [
-    { slot: "breakfast", offsetMinutesBeforeMeal: breakfastMinutes, durationMinutes: 3, task: "Rinse poha; microwave a splash of water." },
+    { slot: "breakfast", offsetMinutesBeforeMeal: breakfastMinutes, durationMinutes: 3, task: hasMicrowave ? "Rinse poha; microwave a splash of water." : "Rinse poha and drain it well." },
     { slot: "breakfast", offsetMinutesBeforeMeal: Math.max(5, breakfastMinutes - 3), durationMinutes: 4, task: exhausted ? "Temper masala and fold in poha." : "Chop extra onion and tomato; store half for dinner." },
     { slot: "breakfast", offsetMinutesBeforeMeal: 4, durationMinutes: 4, task: "Cook poha, finish with lemon, and plate." },
-    { slot: "lunch", offsetMinutesBeforeMeal: lunchMinutes, durationMinutes: 3, task: "Microwave cooked rice until steaming." },
+    { slot: "lunch", offsetMinutesBeforeMeal: lunchMinutes, durationMinutes: 3, task: hasMicrowave ? "Microwave cooked rice until steaming." : "Reheat cooked rice, covered, on the stove." },
     { slot: "lunch", offsetMinutesBeforeMeal: Math.max(3, lunchMinutes - 3), durationMinutes: 3, task: "Mix curd, tomato, salt, and masala." },
     { slot: "lunch", offsetMinutesBeforeMeal: 2, durationMinutes: 2, task: "Assemble the bowl and pack the spoon." },
     { slot: "dinner", offsetMinutesBeforeMeal: dinnerMinutes, durationMinutes: 6, task: "Rinse rice and moong dal; add stored vegetables." },
@@ -258,8 +259,9 @@ export function validateInput(value: unknown): PlannerInput {
   const input = value as PlannerInput;
   if (!Number.isInteger(input.people) || input.people < 1 || input.people > 8) throw new Error("People must be between 1 and 8.");
   if (!Number.isFinite(input.budgetInr) || input.budgetInr < 0 || input.budgetInr > 5000) throw new Error("Budget must be between ₹0 and ₹5,000.");
-  if (!input.windows || slots.some((slot) => !/^([01]\d|2[0-3]):[0-5]\d$/.test(input.windows[slot]?.at) || input.windows[slot].minutes < 5 || input.windows[slot].minutes > 90)) throw new Error("Each meal needs a valid time and a 5–90 minute window.");
+  if (!input.windows || slots.some((slot) => !/^([01]\d|2[0-3]):[0-5]\d$/.test(input.windows[slot]?.at) || !Number.isInteger(input.windows[slot].minutes) || input.windows[slot].minutes < 5 || input.windows[slot].minutes > 90)) throw new Error("Each meal needs a valid time and a 5–90 minute window.");
   if (typeof input.pantry !== "string" || input.pantry.length > 500 || typeof input.restrictions !== "string" || input.restrictions.length > 300) throw new Error("Pantry or restriction text is too long.");
+  if (!Array.isArray(input.appliances) || input.appliances.length > 2 || input.appliances.some((item) => !["Gas stove", "Microwave"].includes(item))) throw new Error("Choose only supported appliances.");
   if (!["low", "medium"].includes(input.effort) || !["exhausted", "normal", "energetic"].includes(input.energy)) throw new Error("Choose a valid effort and energy level.");
   return input;
 }

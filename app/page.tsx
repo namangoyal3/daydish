@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createDemoPlan, defaultInput, type Plan, type PlannerInput, type Slot } from "@/lib/planner";
 
 const mealLabels: Record<Slot, string> = { breakfast: "Breakfast", lunch: "Lunch", dinner: "Dinner" };
@@ -12,9 +12,11 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 export default function Home() {
   const [input, setInput] = useState<PlannerInput>(defaultInput);
+  const [plannedInput, setPlannedInput] = useState<PlannerInput>(defaultInput);
   const [plan, setPlan] = useState<Plan>(() => createDemoPlan(defaultInput));
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const resultsRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
     if (!loading) return;
@@ -37,7 +39,9 @@ export default function Home() {
       const data = await response.json() as Plan & { error?: string };
       if (!response.ok) throw new Error(data.error || "Could not create a plan.");
       setPlan(data);
+      setPlannedInput(input);
       setMessage(data.notice || (data.source === "gemini" ? "Fresh plan created with Gemini." : "Plan ready."));
+      requestAnimationFrame(() => resultsRef.current?.focus());
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Could not create a plan.");
     } finally {
@@ -49,6 +53,7 @@ export default function Home() {
 
   return (
     <main>
+      <a className="skip-link" href="#planner">Skip to planner</a>
       <header className="topbar">
         <a className="brand" href="#top" aria-label="DayDish home"><span className="brand-mark">D</span><span>DayDish<small>DAILY KITCHEN COPILOT</small></span></a>
         <div className="veg-badge"><span>●</span> 100% vegetarian</div>
@@ -60,7 +65,7 @@ export default function Home() {
       </section>
 
       <div className="workspace">
-        <aside className="planner-card">
+        <aside className="planner-card" id="planner">
           <div className="section-heading"><span>01</span><div><h2>Build my day</h2><p>Tell us what the kitchen is working with.</p></div></div>
           <form onSubmit={generate}>
             <div className="two-col">
@@ -80,19 +85,19 @@ export default function Home() {
               <fieldset><legend>Appliances</legend><div className="checks">{["Gas stove", "Microwave"].map((appliance) => <label key={appliance}><input type="checkbox" checked={input.appliances.includes(appliance)} onChange={(e) => setInput({ ...input, appliances: e.target.checked ? [...input.appliances, appliance] : input.appliances.filter((item) => item !== appliance) })} /> {appliance}</label>)}</div></fieldset>
             </div>
 
-            <button className="generate" disabled={loading}>{loading ? <><span className="spinner" /> Optimizing your kitchen…</> : <>Create my cooking day <span>→</span></>}</button>
+            <button className="generate" disabled={loading}>{loading ? <><span className="spinner" aria-hidden="true" /> Optimizing your kitchen…</> : <>Create my cooking day <span aria-hidden="true">→</span></>}</button>
             <p className="form-note">Prices are indicative estimates. Diet, time, and budget are checked by the app.</p>
           </form>
         </aside>
 
-        <section className={`results ${loading ? "is-loading" : ""}`} aria-live="polite" aria-busy={loading}>
-          {message && <div className={`notice ${plan.notice ? "demo" : ""}`}>{message}</div>}
-          <div className="result-title"><div><p className="eyebrow">YOUR OPTIMIZED DAY</p><h2>Today at a glance</h2></div><span className="date-pill">AI plan • India</span></div>
+        <section className={`results ${loading ? "is-loading" : ""}`} aria-busy={loading} aria-labelledby="results-title" ref={resultsRef} tabIndex={-1}>
+          {message && <div className={`notice ${plan.notice ? "demo" : ""}`} role="status" aria-live="polite">{message}</div>}
+          <div className="result-title"><div><p className="eyebrow">YOUR OPTIMIZED DAY</p><h2 id="results-title">Today at a glance</h2></div><span className="date-pill">AI plan • India</span></div>
 
-          <div className="meal-grid">{plan.meals.map((meal) => <article className="meal-card" key={meal.slot}><div className="meal-top"><span>{slotIcons[meal.slot]}</span><div><small>{mealLabels[meal.slot]} • {input.windows[meal.slot].at}</small><h3>{meal.name}</h3></div></div><p>{meal.why}</p><div className="meal-meta"><span>◷ {meal.activeMinutes} min active</span><span>↻ {meal.reuseNote}</span></div></article>)}</div>
+          <div className="meal-grid">{plan.meals.map((meal) => <article className="meal-card" key={meal.slot}><div className="meal-top"><span>{slotIcons[meal.slot]}</span><div><small>{mealLabels[meal.slot]} • {plannedInput.windows[meal.slot].at}</small><h3>{meal.name}</h3></div></div><p>{meal.why}</p><div className="meal-meta"><span>◷ {meal.activeMinutes} min active</span><span>↻ {meal.reuseNote}</span></div></article>)}</div>
 
           <div className="metrics">
-            <div className="score" style={{ "--score": `${plan.summary.efficiencyScore * 3.6}deg` } as React.CSSProperties}><div><strong>{plan.summary.efficiencyScore}</strong><small>/100</small></div></div>
+            <div className="score" role="img" aria-label={`Cooking efficiency score: ${plan.summary.efficiencyScore} out of 100`} style={{ "--score": `${plan.summary.efficiencyScore * 3.6}deg` } as React.CSSProperties}><div aria-hidden="true"><strong>{plan.summary.efficiencyScore}</strong><small>/100</small></div></div>
             <div className="metric-copy"><p className="eyebrow">COOKING EFFICIENCY</p><h3>A smoother kitchen day</h3><div className="metric-list"><span><b>₹{plan.substitutions.reduce((sum, item) => sum + item.savingInr, 0)}</b> potential savings</span><span><b>{plan.summary.minutesSaved} min</b> saved by reuse</span><span><b>{plan.summary.reusedIngredients}</b> cross-meal reuses</span><span><b>{plan.summary.pans}</b> pans to wash</span></div></div>
             <div className={`budget-status ${plan.summary.budgetStatus}`}><small>ESTIMATED SPEND</small><strong>₹{plan.summary.estimatedAdditionalSpendInr}</strong><span>{statusLabel}</span><p>of ₹{plan.summary.budgetInr} budget</p></div>
           </div>
@@ -103,7 +108,7 @@ export default function Home() {
           </section>
 
           <div className="bottom-grid">
-            <section className="content-card"><div className="card-heading"><div><p className="eyebrow">ONE CONSOLIDATED LIST</p><h2>Buy once</h2></div><span>{plan.groceries.length} items</span></div>{plan.groceries.length ? <div className="grocery-list">{plan.groceries.map((item) => <div key={item.name}><span className="check-box">✓</span><div><b>{item.name}</b><small>{item.quantity} • {item.reason}</small></div><strong>₹{item.estimatedPriceInr}</strong></div>)}</div> : <p className="empty">Your pantry already covers today&apos;s plan.</p>}<div className="total"><span>Estimated total</span><strong>₹{plan.summary.estimatedAdditionalSpendInr}</strong></div><small className="price-note">{plan.summary.pricingNote}</small></section>
+            <section className="content-card"><div className="card-heading"><div><p className="eyebrow">ONE CONSOLIDATED LIST</p><h2>Grocery list</h2></div><span>{plan.groceries.length} items</span></div>{plan.groceries.length ? <div className="grocery-list">{plan.groceries.map((item) => <div key={item.name}><span className="check-box" aria-hidden="true">✓</span><div><b>{item.name}</b><small>{item.quantity} • {item.reason}</small></div><strong>₹{item.estimatedPriceInr}</strong></div>)}</div> : <p className="empty">Your pantry already covers today&apos;s plan.</p>}<div className="total"><span>Estimated total</span><strong>₹{plan.summary.estimatedAdditionalSpendInr}</strong></div><small className="price-note">{plan.summary.pricingNote}</small></section>
 
             <section className="content-card"><div className="card-heading"><div><p className="eyebrow">BACKUP OPTIONS</p><h2>Smart swaps</h2></div></div><div className="swap-list">{plan.substitutions.map((item) => <div key={item.ingredient}><div><b>{item.ingredient}</b><span>→</span><b>{item.swap}</b></div><small>{item.reason}</small><strong>Save ~₹{item.savingInr}</strong></div>)}</div><div className="leftover"><span>↻</span><div><b>Tomorrow is already easier</b><p>{plan.leftoverPlan}</p></div></div></section>
           </div>
