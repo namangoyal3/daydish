@@ -29,6 +29,7 @@ const schema = {
     },
     timeline: {
       type: "array",
+      maxItems: 15,
       items: {
         type: "object",
         required: ["slot", "offsetMinutesBeforeMeal", "durationMinutes", "task"],
@@ -40,6 +41,7 @@ const schema = {
     },
     groceries: {
       type: "array",
+      maxItems: 20,
       items: {
         type: "object",
         required: ["name", "quantity", "estimatedPriceInr", "reason"],
@@ -48,6 +50,7 @@ const schema = {
     },
     substitutions: {
       type: "array",
+      maxItems: 6,
       items: {
         type: "object",
         required: ["ingredient", "swap", "savingInr", "reason"],
@@ -79,7 +82,7 @@ async function generateWithGemini(input: PlannerInput, key: string) {
     headers: { "Content-Type": "application/json", "x-goog-api-key": key },
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: promptFor(input) }] }],
-      generationConfig: { temperature: 0.35, responseMimeType: "application/json", responseSchema: schema },
+      generationConfig: { temperature: 0.35, maxOutputTokens: 2048, responseMimeType: "application/json", responseSchema: schema },
     }),
     signal: AbortSignal.timeout(15_000),
   });
