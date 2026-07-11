@@ -157,17 +157,18 @@ export function finalisePlan(
   }
   const groceries = candidate.groceries
     .filter((item) => !has(input.pantry, item.name))
+    .slice(0, 20)
     .map((item) => ({
       ...item,
       estimatedPriceInr: Math.max(0, Math.round(Number(item.estimatedPriceInr) || 0)),
     }));
-  const timeline = addTimes(candidate.timeline, input);
+  const timeline = addTimes(candidate.timeline.slice(0, 15), input);
   return {
     ...candidate,
     meals,
     timeline,
     groceries,
-    substitutions: candidate.substitutions.map((item) => ({ ...item, savingInr: Math.max(0, Math.round(Number(item.savingInr) || 0)) })),
+    substitutions: candidate.substitutions.slice(0, 6).map((item) => ({ ...item, savingInr: Math.max(0, Math.round(Number(item.savingInr) || 0)) })),
     summary: summaryFor(input, meals, groceries, timeline),
   };
 }

@@ -41,3 +41,14 @@ test("fallback never asks for an unavailable microwave", () => {
   const plan = createDemoPlan({ ...defaultInput, appliances: ["Gas stove"] });
   assert.doesNotMatch(plan.timeline.map((task) => task.task).join(" "), /microwave/i);
 });
+
+test("model arrays are capped after generation", () => {
+  const candidate = createDemoPlan(defaultInput);
+  const plan = finalisePlan(defaultInput, {
+    ...candidate,
+    timeline: Array(30).fill(candidate.timeline[0]),
+    groceries: Array(30).fill(candidate.groceries[0]),
+    substitutions: Array(30).fill(candidate.substitutions[0]),
+  });
+  assert.deepEqual([plan.timeline.length, plan.groceries.length, plan.substitutions.length], [15, 20, 6]);
+});

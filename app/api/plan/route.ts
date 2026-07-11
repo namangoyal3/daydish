@@ -16,8 +16,6 @@ const schema = {
   properties: {
     meals: {
       type: "array",
-      minItems: 3,
-      maxItems: 3,
       items: {
         type: "object",
         required: ["slot", "name", "why", "activeMinutes", "reuseNote"],
@@ -29,7 +27,6 @@ const schema = {
     },
     timeline: {
       type: "array",
-      maxItems: 15,
       items: {
         type: "object",
         required: ["slot", "offsetMinutesBeforeMeal", "durationMinutes", "task"],
@@ -41,7 +38,6 @@ const schema = {
     },
     groceries: {
       type: "array",
-      maxItems: 20,
       items: {
         type: "object",
         required: ["name", "quantity", "estimatedPriceInr", "reason"],
@@ -50,7 +46,6 @@ const schema = {
     },
     substitutions: {
       type: "array",
-      maxItems: 6,
       items: {
         type: "object",
         required: ["ingredient", "swap", "savingInr", "reason"],
